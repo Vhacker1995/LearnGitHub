@@ -169,3 +169,453 @@ sshd(8)
      created OpenSSH.  Markus Friedl contributed the support for SSH protocol
      versions 1.5 and 2.0.
 OpenBSD 4.2                      May 31, 2007                                5
+
+
+
+SSH指南--配置文件
+服务器配置文件
+SSH1 AND OPENSSH的配置文件通常是/etc/sshd_config,而SSH2的配置文件通常是
+/etc/ssh2/sshd2_config。
+
+以非缺省的配置文件来调用sshd，可以使用命令 -f 选项。$ sshd -f /usr/local/ssh/my_config。
+
+以*号作为标号的语名都会被sshd忽略。
+
+修改完配置后，修改不会马上影响到服务器，可重启服务器或发送SIGHUP信号。$ kill -HUP 
+`cat /etc/sshd.pid`
+
+如果在命令行改动了配置，用SIGHUP信号重启服务器不能覆盖命令行的配置，它的优先
+级高。
+
+主机密钥，sshd主机密钥向SSH客户端唯一地标识SSH服务器。主机密钥保存在一对文件
+中，一个文件包含私钥，一个文件包含公钥。对于SSH1 AND OPENSSH，它是
+/etc/ssh_host_key。文件位置可用HostKey关键字修改 HostKey /usr/local/ssh/key。服务器的
+公钥保存在.pub文件中。
+OPENSSH服务器有一个SSH-2的主机密钥，缺省是在/etc/ssh_host_dsa_key。其位置可用
+HostDsaKey /usr/local/openssh/key2修改。
+
+对于SSH2，如果服务器是由超级用户运行，缺省私钥文件是/etc/ssh2/hostkey。如果是其它
+用户运行，则在~/.ssh2/hostkey。可用HostKeyFile /etc/local/ssh/key修改。公钥是hostkey.pub
+文件，可用publicHostKeyFile关键字修改。
+
+可以用命令行选项指定私钥文件：$ sshd -h /usr/local/ssh/key。
+
+随机数种子文件
+如果用户的系统中有一个随机位源，如/dev/urandom，那么OPENSSH就不能创建随机数种
+子文件。
+
+服务器配置文件
+通常是/etc/sshd_config /etc/ssh2/ssh2_config，可以用-f 选项重新指定其配置文件。可用于一
+台机器运行多个sshd的情况。
+
+每账号认证文件。~/.ssh/authorized_keys 
+
+文件权限
+由于配置文件的权限设置错误，会降低系统的安全性，所以可以设置StrictModes YES/NO
+关键字，对sshd的重要文件和目录的权限进行检查，如果检查失败，服务器就拒绝对该用
+户的SSH连接。
+
+在多宿主主机上，使用ListenAddress xxx.xxx.xxx.xxx来限制SSH只监听一个网络接口。
+
+空闲连接时间，IdleTimeout xx	如果是0代表什么都不做，保持连接。否则，超时就断开连
+接，可以用s,m,h,d,w表示。
+
+KeepAlive YES/NO 可以断开失效的连接，比如客户端崩溃。
+
+失败的登录
+LogingGraceTime  60	限定用户必须在60秒内成功进行认证。 0值表禁用。命令行选项用 
+-g
+
+PasswordGuesses 5	如果连接请求使用密码认证，那么sshd2就只允许客户端尝试五次。
+（SSH2)
+
+限制并发连接
+MaxConnections 32	最大32个连接（SSH2）
+
+逆向IP映射
+SSH2服务器可以根据客户端地址进行逆向DNS查询，以确保客户端的地址就是这个地址。
+如果检查失败，连接拒绝。
+RequireReverseMapping yes	(ssh2)
+
+转发
+AllowTcp-Forwarding 	yes  	
+X11Forwarding		yes
+
+服务器密钥生成
+该密钥用来对客户端/服务器之间的通信进行保护。是临时的，永远不会保存在磁盘上。服
+务器在启动时生成这个密钥。并以固定的周期重新生成。缺省长度是768位，最小为512，
+可以ServerKeyBits  2048 指定长度。用KeyRegenerationInterval 1200指定周期。 命令行选
+项：-k
+
+加密算法
+Ciphers	any	允许所有支持算法。其它算法包括
+3des-cbc,blowfish-cbc,twofish-cbc,arcfour,none
+
+mac算法
+MAC关键字可以让用户选择sshd2进行完整性检测所使用的算法，称为消息认证代码。用
+于sshd2的有hmac-sha1,hmac-md5,hmac-md5-96。
+
+在OPENSSH中，用户可以用Protocol关键字选择支持SSH-1 AND SSH-2,1 代表SSH-1,2 代
+表SSH-2,  1，2 代表都支持。
+
+允许用户登录：认证和访问控制
+1、认证负责对发起连接请求的用户的身份进行验证。
+密码认证
+PasswordAuthentication yes		AllowedAuthentications password	(ssh2)
+公钥认证
+RSAAuthentication yes  (ssh1,openssh/1)
+AllowedAuthentications publickey (ssh2)
+DEAAuthentication yes	(openssh/2)
+Rhosts认证，可信主机认证通过检查远程主机名和相关用户名来实现对客户端的身份认证。
+RhostsAuthentication yes	(ssh1,openssh)
+IgnoreRhosts yes   (ssh1,ssh2,openssh)不使用系统的hosts.equiv and ~/.rhosts，使用SSH专用
+的/etc/shosts.equiv and ~/.shosts
+强可信主机认证。
+RhostsRSAAuthentication yes 		ssh1,openssh
+AllowedAuthentications hostbased	ssh2
+提取已知名主机的公钥
+UserKnownHosts no	ssh2
+IgnoreUserKnownHosts yes		openssh
+PGP认证
+Kerberos认证
+S/key认证
+SecurID认证
+PAM认证
+
+2、访问控制负责允许或禁止来自特定用户、机器在或INTERNET域的SSH连接到服务器
+上。
+通常，只要设置正确，任何账号都可以接收SSH连接，这种访问权限可以使用服务器关键
+字AllowUsers and DenyUsers覆盖。
+AllowUsers smith
+如果配置文件中单独出现一个AllowUsers,后面没有任何内容，就表示禁止所有没提到的用
+户连接，如果没有AllowUsers这个关键字，则所有用户都可连接。DenyUsers表示禁止连接。
+可用通配符，
+
+可以用组访问控制AllowGroups DenyGroups
+
+主机名访问控制
+AllowHosts hostname
+DenyHosts hostname
+
+超级用户的访问控制
+sshd对超级用户专门使用一种特殊的访问机制，PermiRootLogin来允许或禁止使用SSH来
+访问root账号。
+
+显示用户的欢迎信息
+PrintMotd yes/no	default is yes
+
+显示邮件信息
+CheckMail yes/no	default is yes
+
+空密码
+PermitEmptyPasswords	yes/no	如果使用密码认证，并且有个账号没有设定密码，那么服务
+器就可以拒绝访问这个账号
+
+如果系统中存在/etc/nologin，那么sshd就只允许root用户登录，其它都不能登录。因此，touch 
+/etc/nologin是把访问权只授给系统管理员的一种快速方法。这样并不需要重新配置ssh。也
+不需要重启ssh。
+
+子系统
+定义和调用远程命令的一个抽象层，用户可以通过在客户端命令行中给出命令来调用远程命
+令，如：ssh server.examply.com /bin/tar c /home 这个命令调用tar,远程把/home拷贝到磁带上。
+子系统是服务器机器上预定义的一组远程命令，这样就可以方便地执行。在服务器配置文档
+中定义：subsystem backups	/bin/tar c /home，要在服务器上运行该命令，可以使用 -s 选项。
+ssh -s backups server.example.com。缺省情况下，sshd_config中定义了一个子系统,subsystem 
+sftp 。不要删除这个子系统，这是scp2和sftp必须的。
+
+日志
+Fascisl Logging mode	把调试信息打印到系统日志文件中，可以使用FascistLogging关键字
+启用。
+调试模式	可以使用-d命令选项启用
+安静模式	只能输出严重错误，而不能输出 普通日志，可以使用QuietMode关键字或-q
+命令行启用。
+openssh中的日志配置关键字是SyslogFacility and LogLevel。SyslogFacility设置syslog的
+facility（KERN,DAEMON,USER,AUTH,MAIL等），LogLevel记录日志提供的详细程度，该
+值从低到高顺序是：QUIET,FATAL,ERROR,INFO,VERBOSE,DEBUG,使用DEBUG会侵犯用
+户的隐私权，这个级别只能用于诊断，而不能用于普通操作。
+
+
+
+服务器范围配置
+1、禁用其它访问方式。
+关掉r-命令，方法如下：删除/etc/hosts.equiv文件，或改为只读空文件。禁用rshd,rlogind and 
+rexecd，通过修改inetd.conf文件。
+2、/etc/sshd_config配置
+HostKey /etc/ssh_host_key
+PidFile /etc/sshd.pid
+RandomSeed /etc/ssh_random_seed
+
+StrictModes yes		要求用户保护其与SSH有关的文件及目录
+Umask 0077		保证所有SSHD1创建是文件和目录都只能由其所有者（SSHD 运行的
+UID）读取
+
+port 22		
+ListenAddress 0.0.0.0
+IdleTimeout 15m		15分钟空闲超时
+KeepAlive yes		客户机死机时连接将会终止，而不会长期挂起。
+
+LoginGraceTime 30	登录时成功认证的时限为30秒。
+
+ServerKeyBits 768	服务器密钥长度
+KeyRegenerationInterval 3600	服务器密钥一小时重新生成一次
+
+PasswordAuthentication no	禁用密码认证
+RhostsAuthentication no		禁用可信主机认证
+RhostsRSAAuthentication no	禁用增强可信主机认证
+RSAAuthentication yes		启用公钥认证
+
+IgnoreRhosts yes		完全禁止SSHD使用.rhosts文件
+IgnoreRootRhosts yes		
+
+UseLogin no		禁用UseLogin，防止万一使用了其它登录程序
+
+AllowHosts xxx		根据需要设置
+SilentDeny yes		任何被DenyHosts拒绝的连接都不会向用户返回消息，不必告诉攻击
+者发生了什么，可以增加了排错的难度。
+
+PermitRootLogin	nopwd	允许超级用户通过SSH连接，但不能用密码认证
+
+FascistLogging no	禁用FascistLogging日志方式，因为它会在日志中记录用户特定信息，对
+攻击者有用。
+QuietMode no		禁用QuietMode日志方式，使用日志更详细，敏感度更低
+
+AllowTcpForwarding yes	允许tcp端口转发和X转发，保护其它的tcp连接
+X11Forwarding yes
+
+3、/etc/ssh2/sshd2_config配置
+HostKeyFile /etc/ssh2/hostkey
+PublicHostKeyFile /etc/ssh2/hostkey.pub
+RandmoSeedFile /etc/ssh2/random_seed
+
+UserConfigDirectory
+IdentityFile
+AuthorizstionFile
+
+StrictModes yes
+
+port 22
+listenAddress 0.0.0.0
+KeepAlive yes
+RequireReverseMapping no
+
+LoginGraceTime	30
+
+由于sshd2没有设置服务器密钥的位数的关键字，用户得在启动时使用 -b 选项 $ sshd2 -b 
+1024 ....
+
+AllowedAuthentications publickey
+RequiredAuthentications publickey
+
+IgnoreRhosts yes
+UserKnownHosts no	禁用该项可防止用户给未知主机提供信任权限。
+
+PermitRootLogin nopwd
+
+
+Ciphers any	不能选none
+
+
+QuietMode no
+VerboseMode yes
+
+Ssh1Compatibility no	禁用SSH-1兼容模式
+#Ssh1Path /usr/local/ssh1/sshd1    出于实用原因，也可以启用此模式，之前要指明ssh1服
+务器可执行文件位置
+
+4、每账号配置
+对于SSH1 AND OPENSSH，~/.ssh/authorized_keys中的每一个密钥都必须用适当的选项进
+行限制，from选项限制只能从特定的主机访问特定的密钥。例如，假设文件中包含你家那
+台pc（myhome.isp.net）的公钥,而其它机器根本不可能用那个密钥来认证，我们就可以明确
+限定这一关系：from = "myhome.isp.net" ...key...。还要对适当的密钥设置空闲超时时间：from 
+= "myhome.isp.net" ，idle-timeout=5m ...key...。
+最后，考虑每一个密钥是否需要对到达的连接使用端口转发，代理转发以及分配tty等，如
+果不需要，就可以分别用no-port-forwarding,no-agent-forwarding and no-pty禁用这些特性。
+
+5、密钥管理
+至少创建1024位长的用户密钥，并用好的口令对密钥进行保护。
+
+6、客户端配置
+离开正在运行的ssh客户端时，一定要用密码保护。
+在客户端配置文件中启用某些安全功能，并将其设置为最强
+Host *
+	FallBackToRsh no	禁止使用不安全的r-命令（ssh2）没有这个问题。
+	UseRsh no
+	GatewayPorts no		禁止远程客户端连接本地的转发端口
+	StrictHostKeyChecking ask	在主机密钥发生变化时提醒你。请求你的处理意见。
+配置“/etc/ssh/ssh_config”文件　
+“/etc/ssh/ssh_config”文件是OpenSSH系统范围的配置文件，允许你通过设置不同的选项
+来改变客户端程序的运行方式。这个文件的每一行包含“关键词－值”的匹配，其中“关键
+词”是忽略大小写的。下面列出来的是最重要的关键词，用man命令查看帮助页（ssh　(1)）
+可以得到详细的列表。　
+
+编辑“ssh_config”文件（vi　/etc/ssh/ssh_config），添加或改变下面的参数：　
+
+#　Site-wide　defaults　for　various　options　
+Host　*　
+ForwardAgent　no　
+ForwardX11　no　
+RhostsAuthentication　no　
+RhostsRSAAuthentication　no　
+RSAAuthentication　yes　
+PasswordAuthentication　yes　
+FallBackToRsh　no　
+UseRsh　no　
+BatchMode　no　
+CheckHostIP　yes　
+StrictHostKeyChecking　no　
+IdentityFile　~/.ssh/identity　
+Port　22　
+Cipher　blowfish　
+EscapeChar　~　
+
+下面逐行说明上面的选项设置：　
+
+Host　*　
+选项“Host”只对能够匹配后面字串的计算机有效。“*”表示所有的计算机。　
+
+ForwardAgent　no　
+“ForwardAgent”设置连接是否经过验证代理（如果存在）转发给远程计算机。　
+
+ForwardX11　no　
+“ForwardX11”设置X11连接是否被自动重定向到安全的通道和显示集（DISPLAY　set）。　
+
+RhostsAuthentication　no　
+“RhostsAuthentication”设置是否使用基于rhosts的安全验证。　
+
+RhostsRSAAuthentication　no　
+“RhostsRSAAuthentication”设置是否使用用RSA算法的基于rhosts的安全验证。　
+
+RSAAuthentication　yes　
+“RSAAuthentication”设置是否使用RSA算法进行安全验证。　
+
+PasswordAuthentication　yes　
+“PasswordAuthentication”设置是否使用口令验证。　
+
+FallBackToRsh　no　
+“FallBackToRsh”设置如果用ssh连接出现错误是否自动使用rsh。　
+
+UseRsh　no　
+“UseRsh”设置是否在这台计算机上使用“rlogin/rsh”。　
+
+BatchMode　no　
+“BatchMode”如果设为“yes”，passphrase/password（交互式输入口令）的提示将被禁止。
+当不能交互式输入口令的时候，这个选项对脚本文件和批处理任务十分有用。　
+
+CheckHostIP　yes　
+
+“CheckHostIP”设置ssh是否查看连接到服务器的主机的IP地址以防止DNS欺骗。建议设
+置为“yes”。　
+
+StrictHostKeyChecking　no　
+“StrictHostKeyChecking”如果设置成“yes”，ssh就不会自动把计算机的密匙加入
+“$HOME/.ssh/known_hosts”文件，并且一旦计算机的密匙发生了变化，就拒绝连接。　
+
+IdentityFile　~/.ssh/identity　
+“IdentityFile”设置从哪个文件读取用户的RSA安全验证标识。　
+
+Port　22　
+“Port”设置连接到远程主机的端口。　
+
+Cipher　blowfish　
+“Cipher”设置加密用的密码。　
+
+EscapeChar　~　
+“EscapeChar”设置escape字符。　
+
+配置“/etc/ssh/sshd_config”文件　
+“/etc/ssh/sshd_config”是OpenSSH的配置文件，允许设置选项改变这个daemon的运行。
+这个文件的每一行包含“关键词－值”的匹配，其中“关键词”是忽略大小写的。下面列出
+来的是最重要的关键词，用man命令查看帮助页（sshd　(8)）可以得到详细的列表。　
+
+编辑“sshd_config”文件（vi　/etc/ssh/sshd_config），加入或改变下面的参数：　
+
+#　This　is　ssh　server　systemwide　configuration　file.　
+Port　22　
+ListenAddress　192.168.1.1　
+HostKey　/etc/ssh/ssh_host_key　
+ServerKeyBits　1024　
+LoginGraceTime　600　
+KeyRegenerationInterval　3600　
+PermitRootLogin　no　
+IgnoreRhosts　yes　
+IgnoreUserKnownHosts　yes　
+StrictModes　yes　
+X11Forwarding　no　
+PrintMotd　yes　
+SyslogFacility　AUTH　
+LogLevel　INFO　
+RhostsAuthentication　no　
+RhostsRSAAuthentication　no　
+RSAAuthentication　yes　
+PasswordAuthentication　yes　
+PermitEmptyPasswords　no　
+AllowUsers　admin　
+
+下面逐行说明上面的选项设置：　
+
+Port　22　
+“Port”设置sshd监听的端口号。　
+
+ListenAddress　192.168.1.1　
+“ListenAddress”设置sshd服务器绑定的IP地址。　
+
+HostKey　/etc/ssh/ssh_host_key　
+
+“HostKey”设置包含计算机私人密匙的文件。　
+
+ServerKeyBits　1024　
+“ServerKeyBits”定义服务器密匙的位数。　
+
+LoginGraceTime　600　
+“LoginGraceTime”设置如果用户不能成功登录，在切断连接之前服务器需要等待的时间（以
+秒为单位）。　
+
+KeyRegenerationInterval　3600　
+“KeyRegenerationInterval”设置在多少秒之后自动重新生成服务器的密匙（如果使用密匙）。
+重新生成密匙是为了防止用盗用的密匙解密被截获的信息。　
+
+PermitRootLogin　no　
+“PermitRootLogin”设置root能不能用ssh登录。这个选项一定不要设成“yes”。　
+
+IgnoreRhosts　yes　
+“IgnoreRhosts”设置验证的时候是否使用“rhosts”和“shosts”文件。　
+
+IgnoreUserKnownHosts　yes　
+“IgnoreUserKnownHosts”设置ssh　daemon是否在进行RhostsRSAAuthentication安全验证
+的时候忽略用户的“$HOME/.ssh/known_hosts”　
+
+StrictModes　yes　
+“StrictModes”设置ssh在接收登录请求之前是否检查用户家目录和rhosts文件的权限和所
+有权。这通常是必要的，因为新手经常会把自己的目录和文件设成任何人都有写权限。　
+
+X11Forwarding　no　
+“X11Forwarding”设置是否允许X11转发。　
+
+PrintMotd　yes　
+“PrintMotd”设置sshd是否在用户登录的时候显示“/etc/motd”中的信息。　
+
+SyslogFacility　AUTH　
+“SyslogFacility”设置在记录来自sshd的消息的时候，是否给出“facility　code”。　
+
+LogLevel　INFO　
+“LogLevel”设置记录sshd日志消息的层次。INFO是一个好的选择。查看sshd的man帮
+助页，已获取更多的信息。　
+
+RhostsAuthentication　no　
+“RhostsAuthentication”设置只用rhosts或“/etc/hosts.equiv”进行安全验证是否已经足够了。　
+
+RhostsRSAAuthentication　no　
+“RhostsRSA”设置是否允许用rhosts或“/etc/hosts.equiv”加上RSA进行安全验证。　
+
+RSAAuthentication　yes　
+“RSAAuthentication”设置是否允许只有RSA安全验证。　
+
+PasswordAuthentication　yes　
+“PasswordAuthentication”设置是否允许口令验证。　
+
+PermitEmptyPasswords　no　
+“PermitEmptyPasswords”设置是否允许用口令为空的帐号登录。　
+
+AllowUsers　admin　
+“AllowUsers”的后面可以跟着任意的数量的用户名的匹配串（patterns）或user@host这样
+的匹配串，这些字符串用空格隔开。主机名可以是DNS名或IP地址。
